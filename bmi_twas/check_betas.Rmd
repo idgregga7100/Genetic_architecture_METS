@@ -1,0 +1,40 @@
+---
+title: "check_en-mashr"
+author: "Isabelle"
+date: "10/17/2024"
+output: html_document
+---
+
+```{r}
+library(data.table)
+library(ggplot2)
+library(dplyr)
+```
+```{r}
+en<-fread('AoU-afr-scaled-bmi_AFA-PBMC-EN-baseline.csv')
+mashr<-fread('AoU-afr-scaled-bmi_AFA-PBMC-mashr-baseline.csv')
+```
+```{r}
+en<-select(en,gene,gene_name,zscore,effect_size,pvalue)
+enbonf<-0.05/nrow(en)
+mashr<-select(mashr,gene,gene_name,zscore,effect_size,pvalue)
+mashrbonf<-0.05/nrow(mashr)
+data<-inner_join(en,mashr,by=c('gene','gene_name'))
+data<-mutate(data,significance=ifelse(data$pvalue.x<enbonf,'EN-sig',ifelse(data$pvalue.y<mashrbonf,'mashr-sig','non-sig')))
+```
+```{r}
+significance<-factor(data$significance,levels=c('EN-sig','mashr-sig','non-sig'))
+ggplot(data,aes(x=effect_size.x,y=effect_size.y,))+geom_point(aes(color=significance))+geom_abline(slope=1,color='red')+geom_smooth(method='lm',formula=y~x)+xlab('EN effect size')+ylab('mashr effect size')+ylim(-0.2,0.2)+xlim(-1,1)
+
+data2<-filter(data,significance!='non-sig')
+ggplot(data2,aes(x=effect_size.x,y=effect_size.y,))+geom_point(aes(color=significance))+geom_abline(slope=1,color='red')+geom_smooth(method='lm',formula=y~x)+xlab('EN effect size')+ylab('mashr effect size')
+```
+
+```{r}
+ggplot(data,aes(x=-log10(pvalue.x),y=-log10(pvalue.y)))+geom_point()+geom_abline(slope=1,color='red')+geom_smooth(method='lm',formula=y~x)+xlab('EN pvalue')+ylab('mashr pvalue')
+```
+```{r}
+ggplot(data,aes(x=-log10(zscore.x),y=-log10(zscore.y)))+geom_point(aes(color=significance))+geom_abline(slope=1,color='red')+geom_smooth(method='lm',formula=y~x)+xlab('EN zscore')+ylab('mashr zscore')
+```
+
+

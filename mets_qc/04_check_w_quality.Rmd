@@ -1,0 +1,66 @@
+---
+title: "04_check_w_Uchicago_quality"
+author: "Heather Wheeler; rep by Isadore Gregga"
+date: "`r Sys.time()`"
+output: html_document
+---
+
+Merge the UChicago genotyping facility call rates with samples included after 
+missingness filtering to confirm worst samples are excluded.
+
+```{r}
+library(data.table)
+library(dplyr)
+library(readxl)
+library(knitr)
+library(argparse)
+
+call384=read_excel("/home/wheelerlab3/Data/METS/2023-07-26_Genotypes_UChicago/HWheeler-CCK-GSA24v3-platesA1A2B1B2/Excel_Files/HWheeler-GSA24v3-pltsA1A2B1B2-384s-230721_CallRate-Gender.xlsx")
+call518=read_excel("/home/wheelerlab3/Data/METS/2023-07-26_Genotypes_UChicago/HWheeler-CCK-GSA24v3-platesC123456/Excel_Data/HWheeler-CCK-GSA24v3-platesC123456-Aug07_CallRate-Gender.xlsx")
+
+callUC=rbind(call384,call518)
+
+#METS .fam post-missingness QC
+fam=fread("/home/isabelle/METS/updatedQC/QC0.02/missingness_hwe_steps/05filtered_HWE.fam")
+
+all=left_join(callUC,fam,by=join_by("Sample ID"=="V2"))
+
+missing=filter(all,is.na(V1))
+
+#all of the samples filtered out had missing Gender calls (Gender==sex-call from UChicago QC)
+table(missing$Gender)
+
+#all of the samples filtered out had Call Rates < 0.95
+summary(missing$`Call Rate`)
+
+#all of the samples kept out had Call Rates > 0.95, 1st quartile >0.99
+kept=filter(all,!is.na(V1))
+summary(kept$`Call Rate`)
+
+
+#sex check of kept, label clinical data sex as "selfsex"
+kept=mutate(kept,selfsex=ifelse(V5==1,"M",V5))
+kept=mutate(kept,selfsex=ifelse(V5==2,"F",selfsex))
+
+#33 samples Gender does not match selfsex
+table(kept$Gender==kept$selfsex)
+#no missing selfsex
+table(kept$selfsex)
+#6/33 are due to Unknown Gender call in UChicago data
+table(kept$Gender)
+
+#remove Unknowns from kept table
+keptsex = filter(kept,Gender!="Unk",Gender!="Unknown")
+table(keptsex$Gender==keptsex$selfsex)
+#27 sex mismatches, check for errors in retrieving phenotypes
+sexmismatches=filter(keptsex,Gender!=selfsex) 
+#how many are duplicates? check for duplicate IDs
+table(duplicated(sexmismatches$V1))
+#25 samples with sex mismatches, check for errors in retrieving phenotypes or filter out
+knitr::kable(arrange(sexmismatches,V1), format = "simple")
+#Next: do plink sex-check to verify what we've found here.
+#also do relatedness check to verify same ID's match
+
+#table of sexmismatches sorted by plate ID
+knitr::kable(arrange(sexmismatches,`Sample ID`), format = "simple")
+```

@@ -1,0 +1,81 @@
+---
+title: "00_plot_METS_PRS_SNPs"
+author: "Heather Wheeler"
+date: "`r Sys.time()`"
+output: html_document
+---
+
+```{r}
+library(data.table)
+library(dplyr)
+library(ggplot2)
+library(tidyr)
+"%&%" = function(a,b) paste(a,b,sep="")
+
+data = fread("/home/isabelle/METS/METS_table_prsmodels_afreqs_fsts.txt")
+```
+
+## plot AF distributions by site
+```{r}
+af = select(data, ID, ALT_FREQS_GH, ALT_FREQS_JA, ALT_FREQS_SA, ALT_FREQS_US)
+colnames(af) = c("ID","GH","JA","SA","US")
+aflong = pivot_longer(af,cols=GH:US,names_to = "site", values_to = "ALT_AF")
+ggplot(aflong, aes(x=ALT_AF,color=site)) + geom_density()
+
+#calc MAF
+maflong = mutate(aflong, MAF=ifelse(ALT_AF>0.5,1-ALT_AF,ALT_AF))
+ggplot(maflong, aes(x=MAF,color=site)) + geom_density()
+```
+
+## plot MAF vs. PRS effect size
+```{r}
+weights = select(data, ID, ALT_FREQS_GH, ALT_FREQS_JA, ALT_FREQS_SA, ALT_FREQS_US, `afr_1e-06`, `amr_1e-06`, `eur_1e-06`)
+colnames(weights) = c("ID","GH","JA","SA","US","AFR_wt","AMR_wt","EUR_wt")
+weightslong = pivot_longer(weights,cols=GH:US,names_to = "site", values_to = "ALT_AF") |>
+   mutate(MAF=ifelse(ALT_AF>0.5,1-ALT_AF,ALT_AF))
+summary(weightslong)
+
+AFRfilt = filter(weightslong,AFR_wt<= -0.005 | AFR_wt >= 0.005)
+ggplot(AFRfilt, aes(x=MAF,y=AFR_wt, color=site)) +   geom_point()
+ggplot(AFRfilt, aes(x=MAF,y=AFR_wt)) +  geom_bin2d() + facet_wrap(~site)
+
+AFRfilt = filter(weightslong,AFR_wt<= -0.001 | AFR_wt >= 0.001)
+ggplot(AFRfilt, aes(x=MAF,y=AFR_wt, color=site)) +   geom_point()
+ggplot(AFRfilt, aes(x=MAF,y=AFR_wt)) +  geom_bin2d() + scale_fill_continuous(type = "viridis") + facet_wrap(~site)
+
+AMRfilt = filter(weightslong,AMR_wt<= -0.001 | AMR_wt >= 0.001)
+ggplot(AMRfilt, aes(x=MAF,y=AMR_wt, color=site)) +   geom_point()
+ggplot(AMRfilt, aes(x=MAF,y=AMR_wt)) +  geom_bin2d() + scale_fill_continuous(type = "viridis") + facet_wrap(~site)
+
+EURfilt = filter(weightslong,EUR_wt<= -0.001 | EUR_wt >= 0.001)
+ggplot(EURfilt, aes(x=MAF,y=EUR_wt, color=site)) +   geom_point()
+ggplot(EURfilt, aes(x=MAF,y=EUR_wt)) +  geom_bin2d() + scale_fill_continuous(type = "viridis") + facet_wrap(~site) 
+```
+
+```{r}
+mafwide<-pivot_wider(select(maflong,-ALT_AF),names_from='site',values_from='MAF')
+ggplot(mafwide,aes(x=GH,y=US))+geom_smooth(method='lm',formula=y~x)
+ggplot(mafwide,aes(x=GH,y=US))+geom_bin2d()+scale_fill_continuous(type = "viridis")
+
+ggplot(mafwide,aes(x=JA,y=US))+geom_smooth(method='lm',formula=y~x)
+ggplot(mafwide,aes(x=JA,y=US))+geom_bin2d()+scale_fill_continuous(type = "viridis")
+
+ggplot(mafwide,aes(x=SA,y=US))+geom_smooth(method='lm',formula=y~x)
+ggplot(mafwide,aes(x=SA,y=US))+geom_bin2d()+scale_fill_continuous(type = "viridis")
+```
+
+```{r}
+fst = select(data, ID, WC_FST_GH_JA,WC_FST_GH_SA,WC_FST_GH_US,WC_FST_JA_SA,WC_FST_JA_US,WC_FST_SA_US)
+colnames(fst) = c("ID","GH_JA","GH_SA","GH_US","JA_SA","JA_US","SA_US")
+fstlong = pivot_longer(fst,cols=GH_JA:SA_US,names_to = "site", values_to = "WC_FST")
+
+ggplot(fstlong, aes(x=WC_FST,color=site)) + geom_density()+xlim(-0.01,0.05)
+ggplot(fstlong,aes(x=WC_FST))+geom_density()+xlim(-0.01,0.05)+facet_wrap(~site)
+
+fstus<-select(fst,-GH_JA,-GH_SA,-JA_SA)
+fstuslong<-pivot_longer(fstus,cols=GH_US:SA_US,names_to = "site", values_to = "WC_FST")
+ggplot(fstuslong,aes(x=WC_FST))+geom_density()+xlim(-0.01,0.05)+facet_wrap(~site)
+
+ggplot(fstus,aes(x=GH_US,y=JA_US))+geom_bin2d()+scale_fill_continuous(type = "viridis")+xlim(-0.01,0.21)+ylim(-0.01,0.21)
+#is this one anything
+```

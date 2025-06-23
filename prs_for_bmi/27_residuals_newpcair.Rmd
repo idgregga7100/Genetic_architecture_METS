@@ -1,0 +1,210 @@
+---
+title: "residual adjusted bmis"
+author: "Isabelle"
+date: "1/23/25"
+output: html_document
+---
+
+```{r}
+#load libraries
+library(data.table)
+library(tidyverse)
+library(dplyr)
+library(ggplot2)
+library(wesanderson)
+#paste function to concatenate filenames/paths
+"%&%" = function(a,b) paste(a,b,sep="")
+phi='1e-06'
+```
+```{r}
+#file for modeling made in script 26.5
+all_mets<-fread('newpcair_'%&%phi%&%'_all_mets_data_for_modeling.txt')
+pops_mets<-fread('newpcairALL_'%&%phi%&%'_all_mets_data_for_modeling.txt')
+phenos<-fread("/home/wheelerlab3/Data/METS/2023-07-26_Genotypes_UChicago/METS_phenofile_2023-09-15.txt")
+
+all_mets_all_pheno<-left_join(all_mets,phenos)
+fwrite(all_mets_all_pheno,phi%&%'_all_mets_all_pheno_data_for_modeling.txt',sep='\t',quote=F,row.names=F)
+pops_mets_all_pheno<-left_join(pops_mets,phenos)
+#fwrite(all_mets_all_pheno,phi%&%'_all_mets-pops_all_pheno_data_for_modeling.txt',sep='\t',quote=F,row.names=F)
+```
+
+```{r}
+correlations<-matrix(ncol=4,nrow=40)%>%as.data.frame()
+colnames(correlations)<-c('conditions','METS_pop','PRS_pop','pearson')
+conditions<-c()
+METS_pop<-c()
+PRS_pop<-c()
+pearson<-c()
+
+alladjbmi<-c()
+allpredbmi<-c()
+metspop<-c()
+prspop<-c()
+condition<-c()
+```
+
+```{r}
+###version with conditions
+###all METS
+#baseline residual correlated to prs
+data = all_mets_all_pheno
+data = select(data,allAoU,afrAoU,amrAoU,eurAoU,bmi,sex,age,htn,diabetic,country_abbr,PC1,PC2,PC3,PC4,PC5,PC6,PC7,PC8,PC9,PC10,PC11,PC12,PC13,PC14,PC15)%>%na.omit()
+models<-select(data,allAoU,afrAoU,amrAoU,eurAoU)
+prs_pcs<-select(data,-allAoU,-afrAoU,-amrAoU,-eurAoU)
+
+res = summary(lm(scale(bmi)~.,data=prs_pcs))
+adjbmi<-resid(res)%>%as.data.frame()
+colnames(adjbmi)<-'adjbmi'
+out<-cbind(prs_pcs,adjbmi)
+#fwrite(out,'residuals_tests/'%&%phi%&%'newpcair_METS_w-conditions_baseline_residuals.txt',row.names=F,quote=F,sep='\t')
+
+modellist<-c('allAoU','afrAoU','amrAoU','eurAoU')
+for (i in 1:4){
+  r<-cor(adjbmi,models[,..i])
+  #plot(x=adjbmi$.,y=models[,..i])
+  pearson<-append(pearson,r)
+  METS_pop<-append(METS_pop,'METS')
+  PRS_pop<-append(PRS_pop,modellist[i])
+  conditions<-append(conditions,'controlling for conditions')
+  
+  alladjbmi<-append(alladjbmi,adjbmi$adjbmi)
+  allpredbmi<-append(allpredbmi,models[,..i]%>%pull())
+  metspop<-append(metspop,rep_len('METS',nrow(adjbmi)))
+  prspop<-append(prspop,rep_len(modellist[i],nrow(adjbmi)))
+  condition<-append(condition,rep_len('controlling for conditions',nrow(adjbmi)))
+}
+
+```
+
+
+```{r}
+###version with conditions
+pops<-c('GH','JA','SA','US')
+
+for(pop in pops){
+#baseline
+data = pops_mets_all_pheno%>%filter(country_abbr==pop)
+data = select(data,allAoU,afrAoU,amrAoU,eurAoU,bmi,sex,age,htn,diabetic,PC1,PC2,PC3,PC4,PC5,PC6,PC7,PC8,PC9,PC10,PC11,PC12,PC13,PC14,PC15)%>%na.omit()
+models<-select(data,allAoU,afrAoU,amrAoU,eurAoU)
+prs_pcs<-select(data,-allAoU,-afrAoU,-amrAoU,-eurAoU)
+
+res = summary(lm(scale(bmi)~.,data=prs_pcs))
+adjbmi<-resid(res)%>%as.data.frame()
+colnames(adjbmi)<-'adjbmi'
+out<-cbind(prs_pcs,adjbmi)
+#fwrite(out,'residuals_tests/'%&%phi%&%pop%&%'_newpcair_w-conditions_baseline_residuals.txt',row.names=F,quote=F,sep='\t')
+
+modellist<-c('allAoU','afrAoU','amrAoU','eurAoU')
+for (i in 1:4){
+  r<-cor(adjbmi,models[,..i])
+  #plot(x=adjbmi$.,y=models[,..i])
+  pearson<-append(pearson,r)
+  METS_pop<-append(METS_pop,pop)
+  PRS_pop<-append(PRS_pop,modellist[i])
+  conditions<-append(conditions,'controlling for conditions')
+  
+  alladjbmi<-append(alladjbmi,adjbmi$adjbmi)
+  allpredbmi<-append(allpredbmi,models[,..i]%>%pull())
+  metspop<-append(metspop,rep_len(pop,nrow(adjbmi)))
+  prspop<-append(prspop,rep_len(modellist[i],nrow(adjbmi)))
+  condition<-append(condition,rep_len('controlling for conditions',nrow(adjbmi)))
+}
+
+}
+```
+
+
+```{r}
+###version without conditions
+###all METS
+#baseline
+data = all_mets_all_pheno
+data = select(data,allAoU,afrAoU,amrAoU,eurAoU,bmi,sex,age,country_abbr,PC1,PC2,PC3,PC4,PC5,PC6,PC7,PC8,PC9,PC10,PC11,PC12,PC13,PC14,PC15)%>%na.omit()
+models<-select(data,allAoU,afrAoU,amrAoU,eurAoU)
+prs_pcs<-select(data,-allAoU,-afrAoU,-amrAoU,-eurAoU)
+
+res = summary(lm(scale(bmi)~.,data=prs_pcs))
+adjbmi<-resid(res)%>%as.data.frame()
+colnames(adjbmi)<-'adjbmi'
+out<-cbind(prs_pcs,adjbmi)
+#fwrite(out,'residuals_tests/'%&%phi%&%'newpcair_METS_w-o-conditions_baseline_residuals.txt',row.names=F,quote=F,sep='\t')
+modellist<-c('allAoU','afrAoU','amrAoU','eurAoU')
+for (i in 1:4){
+  r<-cor(adjbmi,models[,..i])
+  #plot(x=adjbmi$.,y=models[,..i])
+  pearson<-append(pearson,r)
+  METS_pop<-append(METS_pop,'METS')
+  PRS_pop<-append(PRS_pop,modellist[i])
+  conditions<-append(conditions,'without conditions')
+  
+  alladjbmi<-append(alladjbmi,adjbmi$adjbmi)
+  allpredbmi<-append(allpredbmi,models[,..i]%>%pull())
+  metspop<-append(metspop,rep_len('METS',nrow(adjbmi)))
+  prspop<-append(prspop,rep_len(modellist[i],nrow(adjbmi)))
+  condition<-append(condition,rep_len('without conditions',nrow(adjbmi)))
+}
+
+```
+
+```{r}
+###version without conditions
+pops<-c('GH','JA','SA','US')
+
+for(pop in pops){
+#baseline
+data = pops_mets_all_pheno%>%filter(country_abbr==pop)
+data = select(data,allAoU,afrAoU,amrAoU,eurAoU,bmi,sex,age,PC1,PC2,PC3,PC4,PC5,PC6,PC7,PC8,PC9,PC10,PC11,PC12,PC13,PC14,PC15)%>%na.omit()
+models<-select(data,allAoU,afrAoU,amrAoU,eurAoU)
+prs_pcs<-select(data,-allAoU,-afrAoU,-amrAoU,-eurAoU)
+
+res = summary(lm(scale(bmi)~.,data=prs_pcs))
+adjbmi<-resid(res)%>%as.data.frame()
+colnames(adjbmi)<-'adjbmi'
+out<-cbind(prs_pcs,adjbmi)
+#fwrite(out,'residuals_tests/'%&%phi%&%pop%&%'_newpcair_w-o-conditions_baseline_residuals.txt',row.names=F,quote=F,sep='\t')
+
+modellist<-c('allAoU','afrAoU','amrAoU','eurAoU')
+for (i in 1:4){
+  r<-cor(adjbmi,models[,..i])
+  #plot(x=adjbmi$.,y=models[,..i])
+  pearson<-append(pearson,r)
+  METS_pop<-append(METS_pop,pop)
+  PRS_pop<-append(PRS_pop,modellist[i])
+  conditions<-append(conditions,'without conditions')
+  
+  alladjbmi<-append(alladjbmi,adjbmi$adjbmi)
+  allpredbmi<-append(allpredbmi,models[,..i]%>%pull())
+  metspop<-append(metspop,rep_len(pop,nrow(adjbmi)))
+  prspop<-append(prspop,rep_len(modellist[i],nrow(adjbmi)))
+  condition<-append(condition,rep_len('without conditions',nrow(adjbmi)))
+}
+}
+```
+
+```{r}
+correlations$conditions<-conditions
+correlations$METS_pop<-METS_pop
+correlations$PRS_pop<-PRS_pop
+correlations$pearson<-pearson
+#correlations
+#fwrite(correlations,'residuals_tests/adjBMI_PRS_correlations_phi'%&%phi%&%'_newpcair.txt',row.names=F,quote=F,sep='\t')
+
+adjvspred<-cbind(alladjbmi,allpredbmi)%>%cbind(metspop)%>%cbind(prspop)%>%cbind(condition)%>%as.data.frame()
+#fwrite(adjvspred,'residuals_tests/adjBMI_with_PRS_phi'%&%phi%&%'_newpcair.txt',row.names=F,quote=F,sep='\t')
+```
+
+```{r}
+correlations<-filter(correlations,conditions=='controlling for conditions')
+ggplot(correlations,aes(x=factor(METS_pop,levels=c('GH','US','SA','JA','METS')),y=pearson,fill=factor(PRS_pop,levels=c("allAoU","afrAoU","amrAoU","eurAoU"))))+geom_bar(position='dodge',stat='identity')+
+  scale_fill_manual(values=wes_palette('Darjeeling2',4,type='discrete'))+labs(x="METS population",fill='PRS validation\npopulation',title='Adjusted BMI vs PRS score correlations '%&%phi)+theme_bw()
+#+facet_wrap(factor(conditions,levels=c('controlling for conditions','without conditions')))
+#MUCH better looking
+#ggsave('Adjusted_BMI_vs_PRS_score_correlations_'%&%phi%&%'.png')
+```
+
+```{r}
+adjvspred<-filter(adjvspred,condition=='controlling for conditions')%>%filter(prspop=='afrAoU')%>%filter(metspop!='METS')
+pop2=factor(adjvspred$metspop,levels=c('GH','US','SA','JA'))
+ggplot(adjvspred,aes(x=as.numeric(alladjbmi),y=as.numeric(allpredbmi),color=pop2))+geom_smooth(method='lm',formula=y~x,se=F)+theme_bw()+xlab('Adjusted BMI')+ylab('Predicted BMI')+labs(title='afrAoU PRS vs Adjusted BMI '%&%phi,color='METS\npopulation')+geom_point(shape=1)+scale_color_manual(values=wes_palette('Darjeeling2',4,type='discrete'))
+ggsave('afrAoU_PRS_vs_Adjusted_BMI_'%&%phi%&%'.png')
+```

@@ -1,0 +1,151 @@
+---
+title: "allele_freq"
+author: "Isabelle"
+date: "2025-01-28"
+output: html_document
+---
+
+```{r}
+library(data.table)
+library(dplyr)
+library(stringr)
+"%&%" = function(a,b) paste(a,b,sep="")
+```
+```{r}
+GHfreq<-fread('allele_freq/METS735_rsid_snpfiltered_GH_allchrs.afreq')
+#hist(GHfreq$ALT_FREQS)
+
+METfreq<-fread('allele_freq/METS735_rsid_snpfiltered_allchrs.afreq')
+#hist(METfreq$ALT_FREQS)
+
+USfreq<-fread('allele_freq/METS735_rsid_snpfiltered_US_allchrs.afreq')
+#hist(USfreq$ALT_FREQS)
+
+JAfreq<-fread('allele_freq/METS735_rsid_snpfiltered_JA_allchrs.afreq')
+#hist(JAfreq$ALT_FREQS)
+
+SAfreq<-fread('allele_freq/METS735_rsid_snpfiltered_SA_allchrs.afreq')
+#hist(SAfreq$ALT_FREQS)
+```
+```{r}
+afr<-fread('/home/isabelle/PRSCSx/prscsx_out_allAoU_METS756_bim/AoU_scaled_bmi_AFR_pst_eff_a1_b0.5_phi1e-06_chr1.txt')
+colnames(afr)<-c('chr','snp','pos','a1','a2','afr')
+for(i in 2:22){
+  model<-fread('/home/isabelle/PRSCSx/prscsx_out_allAoU_METS756_bim/AoU_scaled_bmi_AFR_pst_eff_a1_b0.5_phi1e-06_chr'%&%i%&%'.txt')
+  colnames(model)<-c('chr','snp','pos','a1','a2','afr')
+  afr<-rbind(afr,model)
+}
+
+amr<-fread('/home/isabelle/PRSCSx/prscsx_out_allAoU_METS756_bim/AoU_scaled_bmi_AMR_pst_eff_a1_b0.5_phi1e-06_chr1.txt')
+colnames(amr)<-c('chr','snp','pos','a1','a2','amr')
+for(i in 2:22){
+  model<-fread('/home/isabelle/PRSCSx/prscsx_out_allAoU_METS756_bim/AoU_scaled_bmi_AMR_pst_eff_a1_b0.5_phi1e-06_chr'%&%i%&%'.txt')
+  colnames(model)<-c('chr','snp','pos','a1','a2','amr')
+  amr<-rbind(amr,model)
+}
+
+eur<-fread('/home/isabelle/PRSCSx/prscsx_out_allAoU_METS756_bim/AoU_scaled_bmi_EUR_pst_eff_a1_b0.5_phi1e-06_chr1.txt')
+colnames(eur)<-c('chr','snp','pos','a1','a2','eur')
+for(i in 2:22){
+  model<-fread('/home/isabelle/PRSCSx/prscsx_out_allAoU_METS756_bim/AoU_scaled_bmi_EUR_pst_eff_a1_b0.5_phi1e-06_chr'%&%i%&%'.txt')
+  colnames(model)<-c('chr','snp','pos','a1','a2','eur')
+  eur<-rbind(eur,model)
+}
+
+models<-full_join(afr,amr)%>%full_join(eur)
+GHfreq<-full_join(GHfreq,models,by=c('ID'='snp','#CHROM'='chr'))
+JAfreq<-full_join(JAfreq,models,by=c('ID'='snp','#CHROM'='chr'))
+SAfreq<-full_join(SAfreq,models,by=c('ID'='snp','#CHROM'='chr'))
+USfreq<-full_join(USfreq,models,by=c('ID'='snp','#CHROM'='chr'))
+```
+
+```{r}
+largeGH<-filter(GHfreq,afr>0.01|afr<(-0.01))
+plot(largeGH$ALT_FREQS,largeGH$afr)
+hist(largeGH$ALT_FREQS)
+```
+
+```{r}
+largeUS<-filter(USfreq,afr>0.01|afr<(-0.01))
+plot(largeUS$ALT_FREQS,largeUS$afr)
+hist(largeUS$ALT_FREQS)
+```
+
+```{r}
+filter(GHfreq,ALT_FREQS==0)%>%nrow()
+filter(USfreq,ALT_FREQS==0)%>%nrow()
+filter(JAfreq,ALT_FREQS==0)%>%nrow()
+filter(SAfreq,ALT_FREQS==0)%>%nrow()
+```
+
+```{r}
+gh_ja<-fread('plink2.GH.JA.fst.var')
+gh_sa<-fread('plink2.GH.SA.fst.var')
+gh_us<-fread('plink2.GH.US.fst.var')
+ja_sa<-fread('plink2.JA.SA.fst.var')
+ja_us<-fread('plink2.JA.US.fst.var')
+sa_us<-fread('plink2.SA.US.fst.var')
+```
+```{r}
+GHfreqlite<-select(GHfreq,ID,ALT_FREQS,afr,amr,eur)
+JAfreqlite<-select(JAfreq,ID,ALT_FREQS,afr,amr,eur)
+SAfreqlite<-select(SAfreq,ID,ALT_FREQS,afr,amr,eur)
+USfreqlite<-select(USfreq,ID,ALT_FREQS,afr,amr,eur)
+
+colnames(GHfreqlite)<-c('ID','ALT_FREQS_GH','afr','amr','eur')
+colnames(JAfreqlite)<-c('ID','ALT_FREQS_JA','afr','amr','eur')
+colnames(SAfreqlite)<-c('ID','ALT_FREQS_SA','afr','amr','eur')
+colnames(USfreqlite)<-c('ID','ALT_FREQS_US','afr','amr','eur')
+```
+```{r}
+GHJA<-left_join(GHfreqlite,JAfreqlite)
+GHSA<-left_join(GHfreqlite,SAfreqlite)
+GHUS<-left_join(GHfreqlite,USfreqlite)
+JASA<-left_join(JAfreqlite,SAfreqlite)
+JAUS<-left_join(JAfreqlite,USfreqlite)
+SAUS<-left_join(SAfreqlite,USfreqlite)
+
+gh_ja<-left_join(gh_ja,GHJA)
+gh_sa<-left_join(gh_sa,GHSA)
+gh_us<-left_join(gh_us,GHUS)
+ja_sa<-left_join(ja_sa,JASA)
+ja_us<-left_join(ja_us,JAUS)
+sa_us<-left_join(sa_us,SAUS)
+```
+
+```{r}
+hudsonghja<-fread('hudsonmethod.GH.JA.fst.var')
+hudsonghsa<-fread('hudsonmethod.GH.SA.fst.var')
+hudsonghus<-fread('hudsonmethod.GH.US.fst.var')
+hudsonjasa<-fread('hudsonmethod.JA.SA.fst.var')
+hudsonjaus<-fread('hudsonmethod.JA.US.fst.var')
+hudsonsaus<-fread('hudsonmethod.SA.US.fst.var')
+```
+```{r}
+gh_ja<-left_join(gh_ja,hudsonghja)
+gh_sa<-left_join(gh_sa,hudsonghsa)
+gh_us<-left_join(gh_us,hudsonghus)
+ja_sa<-left_join(ja_sa,hudsonjasa)
+ja_us<-left_join(ja_us,hudsonjaus)
+sa_us<-left_join(sa_us,hudsonjaus)
+```
+
+```{r}
+fwrite(gh_ja,'gh_ja_fst_table.txt',quote=F,row.names=F,sep='\t')
+fwrite(gh_sa,'gh_sa_fst_table.txt',quote=F,row.names=F,sep='\t')
+fwrite(gh_us,'gh_us_fst_table.txt',quote=F,row.names=F,sep='\t')
+fwrite(ja_sa,'ja_sa_fst_table.txt',quote=F,row.names=F,sep='\t')
+fwrite(ja_us,'ja_us_fst_table.txt',quote=F,row.names=F,sep='\t')
+fwrite(sa_us,'sa_us_fst_table.txt',quote=F,row.names=F,sep='\t')
+```
+
+```{r}
+hist(gh_us$WC_FST)
+hist(ja_us$WC_FST)
+#rbind with column of country names
+#ggplot()+geom_density()
+#try fst vs weight (like allele freq vs weights)
+#do other fst method also
+```
+
+

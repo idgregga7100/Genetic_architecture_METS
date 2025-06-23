@@ -1,0 +1,72 @@
+---
+title: "07_check_ibd_dups"
+author: "Heather Wheeler; rep by Isadore Gregga"
+date: "`r Sys.time()`"
+output: html_document
+---
+
+Merge the IBD stats and phenofile to:
+1. check that duplicates have PI_HAT~1
+2. check that relatives (PI_HAT>0.125) are from the same site.
+
+```{r}
+library(data.table)
+library(dplyr)
+library(readxl)
+library(knitr)
+library(ggplot2)
+
+ibd = fread("/home/isabelle/METS/updatedQC/QC0.02/plots_stats/related.and.duplicates.txt")
+
+pihat1 = filter(ibd,PI_HAT>0.9)
+table(pihat1$FID1==pihat1$FID2)
+#6 pairs of duplicates do not have the same METS ID, check for known identical twins or same person
+#for example, are 3243 and 3205 identical twins or same person? note: 3 pairs are them
+knitr::kable(filter(pihat1,FID1!=FID2), format = "simple")
+#make unique FID IID list to remove samples from plink
+fid1=filter(pihat1,FID1!=FID2) |> select(FID1,IID1) |> rename(FID=FID1, IID=IID1)
+fid2=filter(pihat1,FID1!=FID2) |> select(FID2,IID2) |> rename(FID=FID2, IID=IID2)
+fid = unique(rbind(fid1,fid2))
+fwrite(fid, "/home/isabelle/METS/updatedQC/QC0.02/plots_stats/non-dup_pihat1_list.txt",quote=F,sep="\t",col.names = F)
+#Ryan's 02RelatednessFiltering script doesn't remove one of pihat>0.9,
+#because --rel-cutoff is a heuristic, rerun 06_relatedness_fitlering with no cutoff
+#so add one of true dups to list to --remove next
+dups = filter(pihat1,FID1==FID2) |> select(FID1,IID1) |> rename(FID=FID1, IID=IID1)
+fid = unique(rbind(fid,dups))
+fwrite(fid, "/home/isabelle/METS/updatedQC/QC0.02/plots_stats/METS_dups_and_pihat1_list.txt",quote=F,sep="\t",col.names = F)
+
+#add site to ibd table
+pheno = fread("/home/wheelerlab3/2023-08-14_METS_genotype_QC/METS_phenofile_2023-08-22.txt")
+country = select(pheno,FID,IID,country_abbr)
+newibd = left_join(ibd,country,join_by(FID1==FID,IID1==IID))
+newibd = left_join(newibd,country,join_by(FID2==FID,IID2==IID))
+table(newibd$country_abbr.x==newibd$country_abbr.y)
+#all relatives are from the same country site, that's good
+
+#compare non-dup METS id, but PI_HAT~1 phenotypes
+knitr::kable(filter(pheno,FID==1037 | FID==1266), format = "simple")
+knitr::kable(filter(pheno,FID==3101 | FID==3105), format = "simple")
+knitr::kable(filter(pheno,FID==3243 | FID==3205), format = "simple") #multiple wells on plate C4
+knitr::kable(filter(pheno,FID==3294 | FID==3034), format = "simple")
+
+#plot IBD, color by site
+ggplot(newibd,aes(x=Z0,y=Z1,color=country_abbr.x)) + geom_point()
+#plot PI_HAT
+ggplot(newibd,aes(PI_HAT)) + geom_histogram(binwidth = 0.01)
+```
+
+Possible relationships:
+
+|Relationship | PI-HAT | Z0 | Z1 | Z2 |
+|---:|---:|---:|---:|---:|
+|unrelated| 0| 1| 0| 0|
+|identical-twins| 1| 0| 0| 1|
+|parent-child| 0.5| 0| 1| 0|
+|full siblings| 0.5| 0.25| 0.5| 0.25|
+|half-siblings| 0.25| 0.5| 0.5| 0|
+|grandparent-grandchild| 0.25| 0.5| 0.5| 0|
+|avuncular| 0.25| 0.5| 0.5| 0|
+|half-avuncular| 0.125| 0.75| 0.25| 0|
+|first-cousin| 0.125| 0.75| 0.25| 0|
+|half-first-cousin| 0.0625| 0.875| 0.125| 0|
+|half-sibling-plus-first-cousin |0.375| 0.375| 0.5 |0.125|

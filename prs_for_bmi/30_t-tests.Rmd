@@ -1,0 +1,86 @@
+---
+title: "30_t-tests"
+author: "Isabelle"
+date: "2025-05-28"
+output: html_document
+---
+
+```{r}
+library(data.table)
+library(dplyr)
+"%&%" = function(a,b) paste(a,b,sep="")
+phi='1e-06'
+mets_results<-fread('/home/isabelle/METS/PRS_tests/residuals_tests/adjBMI_with_PRS_phi'%&%phi%&%'_newpcair.txt')%>%filter(condition=='controlling for conditions')
+```
+
+```{r}
+#i guess what i can do here is take the difference and then t-test between the differences? i need a value for each indiv?
+#yes this could be a valid way to do it
+#for mets overall
+allmets<-filter(mets_results,metspop=='METS')
+allmets<-mutate(allmets,difference=(allmets$alladjbmi-allmets$allpredbmi))
+all<-filter(allmets,prspop=='allAoU')%>%pull(difference)
+afr<-filter(allmets,prspop=='afrAoU')%>%pull(difference)
+amr<-filter(allmets,prspop=='amrAoU')%>%pull(difference)
+eur<-filter(allmets,prspop=='eurAoU')%>%pull(difference)
+
+t.test(all,afr,mu=0)
+t.test(all,amr,mu=0)
+t.test(all,eur,mu=0)
+t.test(afr,amr,mu=0)
+t.test(afr,eur,mu=0)
+t.test(amr,eur,mu=0)
+```
+
+```{r}
+afrval<-filter(mets_results,prspop=='afrAoU')
+afrval<-mutate(afrval,difference=(afrval$alladjbmi-afrval$allpredbmi))
+mets<-filter(afrval,metspop=='METS')%>%pull(difference)
+gh<-filter(afrval,metspop=='GH')%>%pull(difference)
+ja<-filter(afrval,metspop=='JA')%>%pull(difference)
+sa<-filter(afrval,metspop=='SA')%>%pull(difference)
+us<-filter(afrval,metspop=='US')%>%pull(difference)
+
+t.test(mets,gh,mu=0)
+t.test(mets,ja,mu=0)
+t.test(mets,sa,mu=0)
+t.test(mets,us,mu=0)
+t.test(gh,ja,mu=0)
+t.test(gh,sa,mu=0)
+t.test(gh,us,mu=0)
+t.test(ja,sa,mu=0)
+t.test(ja,us,mu=0)
+t.test(sa,us,mu=0)
+```
+
+okay we need something else, the means of the obs-pred differences are not significantly different from each other. doing a regressionn/anova
+
+```{r}
+afrval<-filter(afrval,metspop!='METS')
+summary(lm(afrval$alladjbmi~afrval$allpredbmi+afrval$metspop))
+anova(lm(afrval$alladjbmi~afrval$allpredbmi+afrval$metspop))
+```
+```{r}
+summary(lm(allmets$alladjbmi~allmets$allpredbmi+allmets$prspop))
+anova(lm(allmets$alladjbmi~allmets$allpredbmi+allmets$prspop))
+```
+
+```{r}
+afrval1<-filter(afrval,metspop!='METS')
+afrval1<-mutate(afrval1,metscode=0)
+for (i in 1:nrow(afrval1)){
+  if(afrval1[i,3]=='GH'){
+    afrval1[i,7]=0
+  }else if(afrval1[i,3]=='JA'){
+    afrval1[i,7]=1
+  }else if(afrval1[i,3]=='SA'){
+    afrval1[i,7]=2
+  }else{
+    afrval1[i,7]=3
+  }
+}
+summary(lm(afrval1$alladjbmi~afrval1$allpredbmi+afrval1$metscode))
+anova(lm(afrval1$alladjbmi~afrval1$allpredbmi+afrval1$metscode))
+```
+
+

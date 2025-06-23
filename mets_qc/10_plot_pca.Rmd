@@ -1,0 +1,168 @@
+---
+title: "10_plot_pca"
+author: "Heather Wheeler; rep Isadore Gregga"
+date: "`r Sys.time()`"
+output: html_document
+---
+
+## METS with all 1000 Genomes populations
+
+```{r}
+library(data.table)
+library(dplyr)
+library(readxl)
+library(knitr)
+library(ggplot2)
+library(wesanderson)
+
+pops = fread("/home/wheelerlab3/Data/1000g_phase3_hg38_plink/all_hg38.psam")
+evec = fread("/home/isabelle/METS/updatedQC/METS_1kg_PCA10.eigenvec")
+eval = fread("/home/isabelle/METS/updatedQC/METS_1kg_PCA10.eigenval")
+#/home/wheelerlab3/Data/METS/2023-07-26_Genotypes_UChicago/METS_phenofile_2023-08-22.txt
+mets = fread("/home/wheelerlab3/Data/METS/2023-07-26_Genotypes_UChicago/METS_phenofile_2023-09-15.txt")
+metspop = unique(select(mets,FID,country_abbr))
+
+#merge pops
+all = left_join(evec,pops,join_by(IID==`#IID`))
+all = left_join(all,metspop,join_by(FID==FID))
+all = mutate(all,pop=ifelse(is.na(country_abbr),SuperPop,country_abbr),
+             finepop=ifelse(is.na(country_abbr),Population,country_abbr))
+
+all2=all
+for(i in 1:nrow(all2)){
+  if(is.na(all2[i,17])){all2[i,16]<-'METS'}
+}
+ggplot(all2,aes(x=PC1,y=PC2,color=pop,label=finepop)) + geom_point(size=1.5) + theme_bw(12) +labs(title='METS genotype PCs with 1KGenomes reference populations',color='Population')
+
+#Darjeeling2 = c("#ECCBAE", "#046C9A", "#D69C4E", "#ABDDDE", "#000000")
+#ggplot default colors for 5 values: "#F8766D" "#A3A500" "#00BF7D" "#00B0F6" "#E76BF3"
+
+mycolors=c("#00BF7D", "#C77CFF", "#f86d6d", "#00B0F6","#ecdcac", "#046C9A", "#d56f4d", "#FF61CC", "#ABDDDE")
+
+ggplot(all2,aes(x=PC1,y=PC2,color=pop,label=finepop)) + geom_point(size=1) + theme_bw(16) +labs(title='METS genotype PCs with 1KG reference populations',color='Population')+scale_color_manual(values=mycolors)
+```
+
+```{r}
+#use the dplyr function mutate to add a column named PC of numbers 1-10
+#and proportion variance explained by each PC
+eval = mutate(eval,PC=as.factor(1:10),pve=V1/sum(V1))
+ggplot(eval, aes(x=PC, y=pve, group=1)) + geom_point() + geom_line() + ylab("variance explained")+ theme_bw(16)
+```
+
+## METS with AFR 1000 Genomes populations
+
+```{r,fig.height=8,fig.width=10}
+evec = fread("/home/isabelle/METS/updatedQC/METS_AFR1kg_PCA10.eigenvec")
+eval = fread("/home/isabelle/METS/updatedQC/METS_AFR1kg_PCA10.eigenval")
+
+#merge pops
+all = left_join(evec,pops,join_by(IID==`#IID`))
+all = left_join(all,metspop,join_by(FID==FID))
+all = mutate(all,pop=ifelse(is.na(country_abbr),SuperPop,country_abbr),
+             finepop=ifelse(is.na(country_abbr),Population,country_abbr))
+
+table(all$finepop)
+
+ggplot(all,aes(x=PC1,y=PC2,color=finepop,label=finepop)) + geom_point(size=5)+ theme_bw(25) + labs(title='METS populations with 1000 Genomes African ancestry reference populations')
+#ggplot(all,aes(x=PC2,y=PC3,color=finepop,label=finepop)) + geom_text(size=2)+ theme_bw(16)
+```
+
+```{r}
+#use the dplyr function mutate to add a column named PC of numbers 1-10
+#and proportion variance explained by each PC
+eval = mutate(eval,PC=as.factor(1:10),pve=V1/sum(V1))
+ggplot(eval, aes(x=PC, y=pve, group=1)) + geom_point() + geom_line() + ylab("variance explained")+ theme_bw(16)
+```
+
+## METS with AFR, but no ASW, 1000 Genomes populations
+```{r,fig.height=8,fig.width=10}
+evec = fread("/home/isabelle/METS/updatedQC/METS_AFR1kg_noASW_PCA10.eigenvec")
+eval = fread("/home/isabelle/METS/updatedQC/METS_AFR1kg_noASW_PCA10.eigenval")
+
+#merge pops
+all = left_join(evec,pops,join_by(IID==`#IID`))
+all = left_join(all,metspop,join_by(FID==FID))
+all = mutate(all,pop=ifelse(is.na(country_abbr),SuperPop,country_abbr),
+             finepop=ifelse(is.na(country_abbr),Population,country_abbr))
+
+#table(all$finepop)
+
+ggplot(all,aes(x=PC1,y=PC2,color=finepop,label=finepop)) + geom_point(size=7)+ theme_bw(50)
+#ggplot(all,aes(x=PC2,y=PC3,color=finepop,label=finepop)) + geom_text(size=2)+ theme_bw(16)
+#zoom in
+#ggplot(all,aes(x=PC2,y=PC3,color=finepop,label=finepop)) + geom_text(size=2) + theme_bw(16) +
+  coord_cartesian(xlim=c(-0.03,0.08),ylim=c(-0.12,0.01))
+```
+
+```{r}
+#use the dplyr function mutate to add a column named PC of numbers 1-10
+#and proportion variance explained by each PC
+eval = mutate(eval,PC=as.factor(1:10),pve=V1/sum(V1))
+ggplot(eval, aes(x=PC, y=pve, group=1)) + geom_point() + geom_line() + ylab("variance explained")+ theme_bw(16)
+```
+
+## METS alone
+```{r,fig.height=6,fig.width=7}
+evec = fread("/home/isabelle/METS/updatedQC/METS_PCA10.eigenvec")
+eval = fread("/home/isabelle/METS/updatedQC/METS_PCA10.eigenval")
+
+#merge pops
+all = left_join(evec,pops,join_by(IID==`#IID`))
+all = left_join(all,metspop,join_by(FID==FID))
+all = mutate(all,pop=ifelse(is.na(country_abbr),SuperPop,country_abbr))
+table(all$pop)
+
+#table(all$pop)
+pop2=factor(all$pop,levels=c('GH','US','SA','JA'))
+ggplot(all,aes(x=PC1,y=PC2,color=pop2)) + geom_point(size=5) + theme_bw(40) + scale_color_manual(values=wes_palette('Darjeeling2',4,type='discrete'))+labs(title='METS genotype PCs',color='METS\npopulation')
+#ggplot(all,aes(x=PC2,y=PC3,color=pop,label=pop)) + geom_text(size=2) + theme_bw(16)
+```
+
+```{r}
+#use the dplyr function mutate to add a column named PC of numbers 1-10
+#and proportion variance explained by each PC
+eval = mutate(eval,PC=as.factor(1:10),pve=V1/sum(V1))
+ggplot(eval, aes(x=PC, y=pve, group=1)) + geom_point() + geom_line() + ylab("variance explained")+ theme_bw(16)
+```
+
+### 1000 Genomes Populations and codes
+- Info from <http://ftp.1000genomes.ebi.ac.uk/vol1/ftp/README_populations.md>
+
+```
+EAS East Asian
+         CHB	Han Chinese             Han Chinese in Beijing, China
+         JPT	Japanese                Japanese in Tokyo, Japan
+         CHS	Southern Han Chinese    Han Chinese South
+         CDX	Dai Chinese             Chinese Dai in Xishuangbanna, China
+         KHV	Kinh Vietnamese         Kinh in Ho Chi Minh City, Vietnam
+         CHD	Denver Chinese          Chinese in Denver, Colorado
+
+EUR European	
+         CEU	CEPH                    Utah residents (CEPH) with Northern and Western European ancestry 
+         TSI	Tuscan                  Toscani in Italia 
+         GBR	British                 British in England and Scotland 
+         FIN	Finnish                 Finnish in Finland 
+         IBS	Spanish                 Iberian populations in Spain 
+
+AFR African	
+         YRI	Yoruba                  Yoruba in Ibadan, Nigeria
+         LWK	Luhya                   Luhya in Webuye, Kenya
+         GWD	Gambian                 Gambian in Western Division, The Gambia 
+         MSL	Mende                   Mende in Sierra Leone
+         ESN	Esan                    Esan in Nigeria
+
+AMR American	
+         ASW	African-American SW     African Ancestry in Southwest US  
+         ACB	African-Caribbean       African Caribbean in Barbados
+         MXL	Mexican-American        Mexican Ancestry in Los Angeles, California
+         PUR	Puerto Rican            Puerto Rican in Puerto Rico
+         CLM	Colombian               Colombian in Medellin, Colombia
+         PEL	Peruvian                Peruvian in Lima, Peru
+
+SAS South Asian
+         GIH	Gujarati                Gujarati Indian in Houston, TX
+         PJL	Punjabi                 Punjabi in Lahore, Pakistan
+         BEB	Bengali                 Bengali in Bangladesh
+         STU	Sri Lankan              Sri Lankan Tamil in the UK
+         ITU	Indian                  Indian Telugu in the UK
+```

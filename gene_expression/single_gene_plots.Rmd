@@ -1,0 +1,78 @@
+---
+title: "gene_plots"
+author: "Isabelle"
+date: "9/11/2024"
+output: html_document
+---
+
+```{r}
+#load libraries
+library(data.table)
+library(tidyverse)
+library(dplyr)
+library(ggplot2)
+library(wesanderson)
+#paste function to concatenate filenames/paths
+"%&%" = function(a,b) paste(a,b,sep="")
+```
+```{r}
+#just to grab some of the largest correlations
+#cor<-fread('combined_spearmancor_sharedgenes.txt')
+```
+
+```{r}
+#looking at PBMC AFA mashr model vs observed
+predicted<-fread('predict_out/PBMC_AFA_mashr_baseline_METS77_predict.txt')
+observed<-fread('/home/paul/mets_expression/peer/METS_age_F_only_king_10PCS_QN_RN_expression10_peer_factor_adjusted.txt',header=T)
+```
+```{r}
+#formatting to match mine 
+observed$gene_id<-str_split_fixed(observed$gene_id,'\\.',n=2)[,1]
+flipped<-t(observed)%>%as.data.frame()
+colnames(flipped)<-flipped[1,]
+flipped<-flipped[2:nrow(flipped),]
+gene_id<-row.names(flipped)%>%as.data.frame()
+
+colnames(gene_id)<-c('IID')
+obsvfixed<-cbind(gene_id,flipped)
+
+#by eye i just noticed paul's doesn't have data for id LD4
+predicted<-filter(predicted, IID!='1310_LD4')
+#okay so now all the cols are in the same order and matched up
+```
+
+
+
+```{r}
+#ggplot prettifying it, try ENSG00000182534
+genes<-c('ENSG00000182534','ENSG00000183172','ENSG00000071894','ENSG00000164308','ENSG00000232629')
+for(ensg in genes){
+predgene<-select(predicted,{{ensg}},IID)
+obsvgene<-select(obsvfixed,{{ensg}},IID)
+
+ids<-predgene$IID
+country<-c()
+for (id in ids){
+  a<-str_sub(id, start=0,end=1)
+  if (a=='3'){
+    country<-append(country,'GH')
+  }else{
+    country<-append(country,'US')
+  }
+}
+predgene<-mutate(predgene,country=country)
+
+predgene$IID<-str_split_fixed(predgene$IID,pattern='_',n=2)[,2]
+obsvgene$IID<-str_split_fixed(obsvgene$IID,pattern='_',n=2)[,2]
+
+gene<-left_join(predgene,obsvgene,by='IID')
+#gene.x=predicted, gene.y=observed
+colnames(gene)<-c('Predicted','IID','country','Observed')
+gene$Observed<-as.numeric(gene$Observed)
+
+print(ggplot(gene,aes(x=Predicted,y=Observed,color=country))+geom_point()+
+        geom_smooth(method='lm',formula=y~x,se=F)+xlab('Predicted')+ylab('Observed')+
+        labs(title=ensg%&%', AFA mashr model') +coord_fixed(ratio=1)+expand_limits(x=c(-2,2))+
+        scale_color_manual(values=wes_palette('Darjeeling2',2,type='discrete')))
+}
+```
